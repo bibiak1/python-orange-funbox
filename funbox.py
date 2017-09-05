@@ -8,6 +8,40 @@ import urllib3, sys, json, Cookie
 from time import sleep
 
 class FunBox(object):
+    def get(self, url):
+        try:
+            r = self.ua.request('GET', self.url + url)
+        except:
+            print 'Error: get (url: ' + url + ')'
+            sys.exit(-1)
+
+        self.cookie.load(r.headers['set-cookie'].replace('/', '...'))
+        self.ident = r.headers['set-cookie'][0:8]
+        return r
+ 
+    def post(self, url, data={}):
+        newurl = self.url + url
+        self.h['content-type'] = 'application/x-sah-ws-1-call+json'
+        self.h['Cookie'] = '; '.join(self.cookie.output(attrs=[], header='').replace('...', '/').split())
+
+        try:
+            r = self.ua.request('POST', newurl, body=json.dumps(data).encode('utf-8'), headers=self.h)
+        except:
+            print 'Error: post (url: ' + url + ')'
+            sys.exit(-1)
+
+        return r
+
+    def authenticate(self, login, password):
+        self.get("/")
+        sleep(1)
+        r = self.post('/authenticate?username=' + login + '&password=' + password, { 'username': login, 'password': password })
+        self.cookie.load(r.headers['set-cookie'].replace('/', '...'))
+        contextID = json.loads(r.data.decode('utf-8'))['data']['contextID'].encode('ascii','ignore')
+        self.h['X-Context'] = contextID
+        self.cookie.load(self.ident + '...login=admin')
+        self.cookie.load(self.ident + '...context=' + contextID)
+
     def __init__(self, url, password, timeout=10, login='admin'):
         self.timeout = timeout
         self.url = url
@@ -15,127 +49,34 @@ class FunBox(object):
         self.ua = urllib3.PoolManager()
         self.h = { 'content-type': 'text/html' }
 
-        try:
-            r = self.ua.request('GET', url)
-        except:
-            print 'Error: getting page'
-            sys.exit(-1)
-
-        self.cookie.load(r.headers['set-cookie'].replace('/', '...'))
-        ident = r.headers['set-cookie'][0:8]
-
-        sleep(1)
-
-        newurl = self.url + '/authenticate?username=' + login + '&password=' + password
-        self.h['content-type'] = 'application/x-sah-ws-1-call+json'
-        self.h['Cookie'] = '; '.join(self.cookie.output(attrs=[], header='').replace('...', '/').split())
-        data = { 'username': login, 'password': password }
-
-        try:
-            r = self.ua.request('POST', newurl, fields=data, headers=self.h)
-        except:
-            print 'Error: auth'
-            sys.exit(-1)
-
-        self.cookie.load(r.headers['set-cookie'].replace('/', '...'))
-        contextID = json.loads(r.data.decode('utf-8'))['data']['contextID'].encode('ascii','ignore')
-        self.h['X-Context'] = contextID
-        self.cookie.load(ident + '...login=admin')
-        self.cookie.load(ident + '...context=' + contextID)
+        self.authenticate(login, password)
 
     def deviceinfo(self):
-        newurl = self.url + '/sysbus/DeviceInfo'
-        self.h['Cookie'] = '; '.join(self.cookie.output(attrs=[], header='').replace('...', '/').split())
-        data = { "parameters": {} }
-
-        try:
-            r = self.ua.request('POST', newurl, body=json.dumps(data).encode('utf-8'), headers=self.h)
-        except:
-            print 'Error: deviceinfo'
-            return False
-
+        r = self.post('/sysbus/DeviceInfo', { "parameters": {} })
         return json.loads(r.data)
 
     def gethosts(self):
-        newurl = self.url + '/sysbus/Hosts:getDevices'
-        self.h['content-type'] = 'application/x-sah-ws-1-call+json'
-        self.h['Cookie'] = '; '.join(self.cookie.output(attrs=[], header='').replace('...', '/').split())
-        data = { "parameters": {} }
-
-        try:
-            r = self.ua.request('POST', newurl, body=json.dumps(data).encode('utf-8'), headers=self.h)
-        except:
-            print 'Error: deviceinfo'
-            return False
-
+        r = self.post('/sysbus/Hosts:getDevices', { "parameters": {} })
         return json.loads(r.data)
 
     def devicesget(self, data={"parameters":{"expression":{"usbM2M":" usb && wmbus and .Active==true","usb":" printer && physical and .Active==true","usblogical":"volume && logical and .Active==true","wifi":"wifi && edev and .Active==true","eth":"eth && edev and .Active==true","dect":"voice && dect && handset && physical"}}}):
-        newurl = self.url + '/sysbus/Devices:get'
-        self.h['content-type'] = 'application/x-sah-ws-1-call+json'
-        self.h['Cookie'] = '; '.join(self.cookie.output(attrs=[], header='').replace('...', '/').split())
-
-        try:
-            r = self.ua.request('POST', newurl, body=json.dumps(data).encode('utf-8'), headers=self.h)
-        except:
-            print 'Error: deviceinfo'
-            return False
-
+        r = self.post('/sysbus/Devices:get', data)
         return json.loads(r.data)
 
     def destroydevice(self, hostmacaddress):
-        newurl = self.url + '/sysbus/Devices:destroyDevice'
-        self.h['content-type'] = 'application/x-sah-ws-1-call+json'
-        self.h['Cookie'] = '; '.join(self.cookie.output(attrs=[], header='').replace('...', '/').split())
-        data = { "parameters": { "key": hostmacaddress} }
-
-        try:
-            r = self.ua.request('POST', newurl, body=json.dumps(data).encode('utf-8'), headers=self.h)
-        except:
-            print 'Error: deviceinfo'
-            return False
-
+        r = self.post('/sysbus/Devices:destroyDevice', { "parameters": { "key": hostmacaddress} })
         return json.loads(r.data)
 
     def getwanstatus(self):
-        newurl = self.url + '/sysbus/NMC:getWANStatus'
-        self.h['content-type'] = 'application/x-sah-ws-1-call+json'
-        self.h['Cookie'] = '; '.join(self.cookie.output(attrs=[], header='').replace('...', '/').split())
-        data = { "parameters": {} }
-
-        try:
-            r = self.ua.request('POST', newurl, body=json.dumps(data).encode('utf-8'), headers=self.h)
-        except:
-            print 'Error: deviceinfo'
-            return False
-
+        r = self.post('/sysbus/NMC:getWANStatus', { "parameters": {} })
         return json.loads(r.data)
 
     def disconnect(self):
-        newurl = self.url + '/sysbus/NeMo/Intf/data:setFirstParameter'
-        self.h['content-type'] = 'application/x-sah-ws-1-call+json'
-        self.h['Cookie'] = '; '.join(self.cookie.output(attrs=[], header='').replace('...', '/').split())
-        data = { "parameters": { "name": "Enable", "value": 0, "flag": "ppp", "traverse": "down"}}
-
-        try:
-            r = self.ua.request('POST', newurl, body=json.dumps(data).encode('utf-8'), headers=self.h)
-        except:
-            print 'Error: stop'
-            return False
-
+        r = self.post('/sysbus/NeMo/Intf/data:setFirstParameter', { "parameters": { "name": "Enable", "value": 0, "flag": "ppp", "traverse": "down"}})
         return json.loads(r.data)
 
     def connect(self):
-        newurl = self.url + '/sysbus/NeMo/Intf/data:setFirstParameter'
-        self.h['content-type'] = 'application/x-sah-ws-1-call+json'
-        self.h['Cookie'] = '; '.join(self.cookie.output(attrs=[], header='').replace('...', '/').split())
-        data = { "parameters": { "name": "Enable", "value": 1, "flag": "ppp", "traverse": "down"}}
-        try:
-            r = self.ua.request('POST', newurl, body=json.dumps(data).encode('utf-8'), headers=self.h)
-        except:
-            print 'Error: stop'
-            return False
-
+        r = self.post('/sysbus/NeMo/Intf/data:setFirstParameter', { "parameters": { "name": "Enable", "value": 1, "flag": "ppp", "traverse": "down"}})
         return json.loads(r.data)
 
     def reconnect(self):
@@ -144,17 +85,7 @@ class FunBox(object):
         return self.connect()
 
     def restart(self):
-        newurl = self.url + '/sysbus/NMC:reboot'
-        self.h['content-type'] = 'application/x-sah-ws-1-call+json'
-        self.h['Cookie'] = '; '.join(self.cookie.output(attrs=[], header='').replace('...', '/').split())
-        data = { "parameters": {} }
-
-        try:
-            r = self.ua.request('POST', newurl, body=json.dumps(data).encode('utf-8'), headers=self.h)
-        except:
-            print 'Error: deviceinfo'
-            return False
-
+        r = self.post('/sysbus/NMC:reboot', { "parameters": {} })
         return True
 
 # vim: tabstop=8 expandtab shiftwidth=4 softtabstop=4
