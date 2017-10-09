@@ -7,76 +7,109 @@
 import urllib3, sys, json, Cookie
 from time import sleep
 
-class FunBox(object):
-    def get(self, url):
-        try:
-            r = self.ua.request('GET', self.url + url)
-        except:
-            print 'Error: get (url: ' + url + ')'
-            sys.exit(-1)
+cookie = Cookie.SimpleCookie()
+ua = urllib3.PoolManager()
+h = { 'content-type': 'text/html' }
+timeout = 10
 
-        self.cookie.load(r.headers['set-cookie'].replace('/', '...'))
-        self.ident = r.headers['set-cookie'][0:8]
-        return r
- 
-    def post(self, url, data={}):
-        newurl = self.url + url
-        self.h['content-type'] = 'application/x-sah-ws-1-call+json'
-        self.h['Cookie'] = '; '.join(self.cookie.output(attrs=[], header='').replace('...', '/').split())
+def uaget(url):
+    global ua, h, timeout
 
-        try:
-            r = self.ua.request('POST', newurl, body=json.dumps(data).encode('utf-8'), headers=self.h)
-        except:
-            print 'Error: post (url: ' + url + ')'
-            sys.exit(-1)
+    try:
+        r = ua.request('GET', url)
+    except:
+        print 'Error: get (url: ' + url + ')'
+        sys.exit(-1)
 
-        return r
+    cookie.load(r.headers['set-cookie'].replace('/', '...'))
+    return r
+     
+def uapost(url, data):
+    global ua, h, timeout
 
-    def authenticate(self, login, password):
-        self.get("/")
-        sleep(1)
-        r = self.post('/authenticate?username=' + login + '&password=' + password, { 'username': login, 'password': password })
-        self.cookie.load(r.headers['set-cookie'].replace('/', '...'))
-        contextID = json.loads(r.data.decode('utf-8'))['data']['contextID'].encode('ascii','ignore')
-        self.h['X-Context'] = contextID
-        self.cookie.load(self.ident + '...login=admin')
-        self.cookie.load(self.ident + '...context=' + contextID)
+    h['content-type'] = 'application/x-sah-ws-1-call+json'
+    h['Cookie'] = '; '.join(cookie.output(attrs=[], header='').replace('...', '/').split())
 
-    def __init__(self, url, password, timeout=10, login='admin'):
-        self.timeout = timeout
+    try:
+        r = ua.request('POST', url, body=json.dumps(data).encode('utf-8'), headers=h)
+    except:
+        print 'Error: post (url: ' + url + ')'
+        sys.exit(-1)
+
+    return r
+
+class Wifi(object):
+    def get(self):
+        r = self.uapost(':get')
+        j = json.loads(r.data)
+        self.Status = j['result']['status']['Status']
+        self.ConfigurationMode = j['result']['status']['ConfigurationMode']
+        self.Enable = j['result']['status']['Enable']
+        return j
+
+    def uaget(self, url):
+        return uaget(self.url + url)
+
+    def uapost(self, url, data={ "parameters": {} }):
+        return uapost(self.url + url, data)
+       
+    def __init__(self, url):
         self.url = url
-        self.cookie = Cookie.SimpleCookie()
-        self.ua = urllib3.PoolManager()
-        self.h = { 'content-type': 'text/html' }
+        self.Status = "Unknown"
+        self.ConfigurationMode = "Unknown"
+        self.Enable = "Unknown"
+    
+class NMC(object):
+    def getWANStatus(self):
+        r = self.uapost(':getWANStatus')
+        return json.loads(r.data)
 
-        self.authenticate(login, password)
+    def uaget(self, url):
+        return uaget(self.url + url)
 
-    def deviceinfo(self):
-        r = self.post('/sysbus/DeviceInfo', { "parameters": {} })
+    def uapost(self, url, data={ "parameters": {} }):
+        return uapost(self.url + url, data)
+       
+    def __init__(self, url):
+        self.url = url
+        self.Wifi = Wifi(url + '/Wifi')
+
+class FunBox(object):
+    def authenticate(self, login, password):
+        global cookie, h, ident
+
+        self.uaget("/")
+        sleep(1)
+        r = self.uapost('/authenticate?username=' + login + '&password=' + password, { 'username': login, 'password': password })
+        cookie.load(r.headers['set-cookie'].replace('/', '...'))
+        contextID = json.loads(r.data.decode('utf-8'))['data']['contextID'].encode('ascii','ignore')
+        h['X-Context'] = contextID
+        ident = r.headers['set-cookie'][0:8]
+        cookie.load(ident + '...login=admin')
+        cookie.load(ident + '...context=' + contextID)
+
+    def DeviceInfo(self):
+        r = self.uapost('/sysbus/DeviceInfo')
         return json.loads(r.data)
 
     def gethosts(self):
-        r = self.post('/sysbus/Hosts:getDevices', { "parameters": {} })
+        r = self.uapost('/sysbus/Hosts:getDevices')
         return json.loads(r.data)
 
     def devicesget(self, data={"parameters":{"expression":{"usbM2M":" usb && wmbus and .Active==true","usb":" printer && physical and .Active==true","usblogical":"volume && logical and .Active==true","wifi":"wifi && edev and .Active==true","eth":"eth && edev and .Active==true","dect":"voice && dect && handset && physical"}}}):
-        r = self.post('/sysbus/Devices:get', data)
+        r = self.uapost('/sysbus/Devices:get', data)
         return json.loads(r.data)
 
     def destroydevice(self, hostmacaddress):
-        r = self.post('/sysbus/Devices:destroyDevice', { "parameters": { "key": hostmacaddress} })
-        return json.loads(r.data)
-
-    def getwanstatus(self):
-        r = self.post('/sysbus/NMC:getWANStatus', { "parameters": {} })
+        r = self.uapost('/sysbus/Devices:destroyDevice', { "parameters": { "key": hostmacaddress} })
         return json.loads(r.data)
 
     def disconnect(self):
-        r = self.post('/sysbus/NeMo/Intf/data:setFirstParameter', { "parameters": { "name": "Enable", "value": 0, "flag": "ppp", "traverse": "down"}})
+        r = self.uapost('/sysbus/NeMo/Intf/data:setFirstParameter', { "parameters": { "name": "Enable", "value": 0, "flag": "ppp", "traverse": "down"}})
         return json.loads(r.data)
 
     def connect(self):
-        r = self.post('/sysbus/NeMo/Intf/data:setFirstParameter', { "parameters": { "name": "Enable", "value": 1, "flag": "ppp", "traverse": "down"}})
+        r = self.uapost('/sysbus/NeMo/Intf/data:setFirstParameter', { "parameters": { "name": "Enable", "value": 1, "flag": "ppp", "traverse": "down"}})
         return json.loads(r.data)
 
     def reconnect(self):
@@ -85,7 +118,22 @@ class FunBox(object):
         return self.connect()
 
     def restart(self):
-        r = self.post('/sysbus/NMC:reboot', { "parameters": {} })
+        self.uapost('/sysbus/NMC:reboot')
         return True
+
+    def uaget(self, url):
+        return uaget(self.url + url)
+
+    def uapost(self, url, data):
+        return uapost(self.url + url, data={ "parameters": {} })
+
+    def __init__(self, url, password, ntimeout=10, login='admin'):
+        global timeout
+
+        self.url = url
+        timeout = ntimeout
+
+        self.authenticate(login, password)
+        self.NMC = NMC(self.url + '/sysbus/NMC')
 
 # vim: tabstop=8 expandtab shiftwidth=4 softtabstop=4
