@@ -59,8 +59,7 @@ class Hosts(object):
 class Devices(object):
     def get(self, data={"parameters":{"expression":{"usbM2M":" usb && wmbus and .Active==true","usb":" printer && physical and .Active==true","usblogical":"volume && logical and .Active==true","wifi":"wifi && edev and .Active==true","eth":"eth && edev and .Active==true","dect":"voice && dect && handset && physical"}}}):
         r = self.uapost(':get', data)
-        print r.data
-        return json.loads(r.data)
+        return json.loads(r.data.decode('utf-8', 'replace'), strict=False)
 
     def destroyDevice(self, hostmacaddress):
         r = self.uapost(':destroyDevice', { "parameters": { "key": hostmacaddress } })
