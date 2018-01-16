@@ -4,7 +4,7 @@
 #import httplib
 #httplib.HTTPConnection.debuglevel = 5
 
-import urllib3, sys, json, Cookie
+import urllib3, sys, json, Cookie, re
 from time import sleep
 
 cookie = Cookie.SimpleCookie()
@@ -38,6 +38,43 @@ def uapost(url, data):
 
     return r
 
+class Hosts(object):
+    def getDevices(self):
+        r = self.uapost(':getDevices')
+        return json.loads(r.data)
+
+    def delHost(self, hostmacaddress):
+        r = self.uapost(':delHost', { "parameters": { "physAddress": hostmacaddress } })
+        return json.loads(r.data)    
+
+    def uaget(self, url):
+        return uaget(self.url + url)
+
+    def uapost(self, url, data={ "parameters": {} }):
+        return uapost(self.url + url, data)
+       
+    def __init__(self, url):
+        self.url = url
+     
+class Devices(object):
+    def get(self, data={"parameters":{"expression":{"usbM2M":" usb && wmbus and .Active==true","usb":" printer && physical and .Active==true","usblogical":"volume && logical and .Active==true","wifi":"wifi && edev and .Active==true","eth":"eth && edev and .Active==true","dect":"voice && dect && handset && physical"}}}):
+        r = self.uapost(':get', data)
+        print r.data
+        return json.loads(r.data)
+
+    def destroyDevice(self, hostmacaddress):
+        r = self.uapost(':destroyDevice', { "parameters": { "key": hostmacaddress } })
+        return json.loads(r.data)
+
+    def uaget(self, url):
+        return uaget(self.url + url)
+
+    def uapost(self, url, data={ "parameters": {} }):
+        return uapost(self.url + url, data)
+       
+    def __init__(self, url):
+        self.url = url
+
 class Wifi(object):
     def get(self):
         r = self.uapost(':get')
@@ -62,6 +99,10 @@ class Wifi(object):
 class NMC(object):
     def getWANStatus(self):
         r = self.uapost(':getWANStatus')
+        return json.loads(r.data)
+
+    def checkForUpgrades(self):
+        r = self.uapost(':checkForUpgrades')
         return json.loads(r.data)
 
     def uaget(self, url):
@@ -92,18 +133,6 @@ class FunBox(object):
         r = self.uapost('/sysbus/DeviceInfo')
         return json.loads(r.data)
 
-    def gethosts(self):
-        r = self.uapost('/sysbus/Hosts:getDevices')
-        return json.loads(r.data)
-
-    def devicesget(self, data={"parameters":{"expression":{"usbM2M":" usb && wmbus and .Active==true","usb":" printer && physical and .Active==true","usblogical":"volume && logical and .Active==true","wifi":"wifi && edev and .Active==true","eth":"eth && edev and .Active==true","dect":"voice && dect && handset && physical"}}}):
-        r = self.uapost('/sysbus/Devices:get', data)
-        return json.loads(r.data)
-
-    def destroydevice(self, hostmacaddress):
-        r = self.uapost('/sysbus/Devices:destroyDevice', { "parameters": { "key": hostmacaddress} })
-        return json.loads(r.data)
-
     def disconnect(self):
         r = self.uapost('/sysbus/NeMo/Intf/data:setFirstParameter', { "parameters": { "name": "Enable", "value": 0, "flag": "ppp", "traverse": "down"}})
         return json.loads(r.data)
@@ -124,8 +153,8 @@ class FunBox(object):
     def uaget(self, url):
         return uaget(self.url + url)
 
-    def uapost(self, url, data):
-        return uapost(self.url + url, data={ "parameters": {} })
+    def uapost(self, url, data = { "parameters": {} }):
+        return uapost(self.url + url, data)
 
     def __init__(self, url, password, ntimeout=10, login='admin'):
         global timeout
@@ -135,5 +164,7 @@ class FunBox(object):
 
         self.authenticate(login, password)
         self.NMC = NMC(self.url + '/sysbus/NMC')
+        self.Hosts = Hosts(self.url + '/sysbus/Hosts')
+        self.Devices = Devices(self.url + '/sysbus/Devices')
 
 # vim: tabstop=8 expandtab shiftwidth=4 softtabstop=4
