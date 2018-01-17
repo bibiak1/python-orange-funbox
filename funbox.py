@@ -65,6 +65,13 @@ class Devices(object):
         r = self.uapost(':destroyDevice', { "parameters": { "key": hostmacaddress } })
         return json.loads(r.data)
 
+    def setName(self, physAddress, name):
+        physAddress = physAddress.upper()
+        r = self.uapost('/Device/' + physAddress + ':setName', { "parameters": { "name": name } })
+        for i in ['default', 'mdns', 'webui']:
+            r = self.uapost('/Device/' + physAddress + ':setName', { "parameters": { "name": name, "source": i } })
+        return json.loads(r.data)
+
     def uaget(self, url):
         return uaget(self.url + url)
 
