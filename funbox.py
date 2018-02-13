@@ -68,8 +68,11 @@ class Devices(object):
     def setName(self, physAddress, name):
         physAddress = physAddress.upper()
         r = self.uapost('/Device/' + physAddress + ':setName', { "parameters": { "name": name } })
-        for i in ['default', 'mdns', 'webui']:
+        #print r.data
+        #for i in ['default', 'mdns', 'webui']:
+        for i in ['default', 'webui']:
             r = self.uapost('/Device/' + physAddress + ':setName', { "parameters": { "name": name, "source": i } })
+            #print r.data
         return json.loads(r.data)
 
     def uaget(self, url):
@@ -80,6 +83,48 @@ class Devices(object):
        
     def __init__(self, url):
         self.url = url
+
+class data(object):
+    def setFirstParameter(self, data):
+        r = self.uapost(':setFirstParameter', data)
+
+        return json.loads(r.data)
+
+    def getMIBs(self, name):
+        r = self.uapost(':getMIBs', {"parameters": {"mibs": name}})
+
+        return json.loads(r.data)
+
+    def uaget(self, url):
+        return uaget(self.url + url)
+
+    def uapost(self, url, data={ "parameters": {} }):
+        return uapost(self.url + url, data)
+
+    def __init__(self, url):
+        self.url = url
+
+class Intf(object):
+    def uaget(self, url):
+        return uaget(self.url + url)
+
+    def uapost(self, url, data={ "parameters": {} }):
+        return uapost(self.url + url, data)
+
+    def __init__(self, url):
+        self.url = url
+        self.data = data(url + '/data')
+
+class NeMo(object):
+    def uaget(self, url):
+        return uaget(self.url + url)
+
+    def uapost(self, url, data={ "parameters": {} }):
+        return uapost(self.url + url, data)
+
+    def __init__(self, url):
+        self.url = url
+        self.Intf = Intf(url + '/Intf')
 
 class Wifi(object):
     def get(self):
@@ -111,6 +156,11 @@ class NMC(object):
         r = self.uapost(':checkForUpgrades')
         return json.loads(r.data)
 
+    def reboot(self):
+        self.uapost(':reboot')
+
+        return True
+
     def uaget(self, url):
         return uaget(self.url + url)
 
@@ -140,12 +190,12 @@ class FunBox(object):
         return json.loads(r.data)
 
     def disconnect(self):
-        r = self.uapost('/sysbus/NeMo/Intf/data:setFirstParameter', { "parameters": { "name": "Enable", "value": 0, "flag": "ppp", "traverse": "down"}})
-        return json.loads(r.data)
+        r = self.NeMo.Intf.data.setFirstParameter({ "parameters": { "name": "Enable", "value": 0, "flag": "ppp", "traverse": "down"}})
+        return r
 
     def connect(self):
-        r = self.uapost('/sysbus/NeMo/Intf/data:setFirstParameter', { "parameters": { "name": "Enable", "value": 1, "flag": "ppp", "traverse": "down"}})
-        return json.loads(r.data)
+        r = self.NeMo.Intf.data.setFirstParameter({ "parameters": { "name": "Enable", "value": 1, "flag": "ppp", "traverse": "down"}})
+        return r
 
     def reconnect(self):
         self.disconnect()
@@ -153,7 +203,7 @@ class FunBox(object):
         return self.connect()
 
     def restart(self):
-        self.uapost('/sysbus/NMC:reboot')
+        self.NMC.reboot()
         return True
 
     def uaget(self, url):
@@ -167,10 +217,12 @@ class FunBox(object):
 
         self.url = url
         timeout = ntimeout
+        self.timeout = ntimeout
 
         self.authenticate(login, password)
         self.NMC = NMC(self.url + '/sysbus/NMC')
         self.Hosts = Hosts(self.url + '/sysbus/Hosts')
         self.Devices = Devices(self.url + '/sysbus/Devices')
+        self.NeMo = NeMo(self.url + '/sysbus/NeMo')
 
 # vim: tabstop=8 expandtab shiftwidth=4 softtabstop=4
