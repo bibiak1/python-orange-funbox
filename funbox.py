@@ -21,7 +21,9 @@ def uaget(url):
         print 'Error: get (url: ' + url + ')'
         sys.exit(-1)
 
-    cookie.load(r.headers['set-cookie'].replace('/', '...'))
+    if 'set-cookie' in r.headers:
+        cookie.load(r.headers['set-cookie'].replace('/', '...'))
+
     return r
      
 def uapost(url, data):
@@ -68,11 +70,8 @@ class Devices(object):
     def setName(self, physAddress, name):
         physAddress = physAddress.upper()
         r = self.uapost('/Device/' + physAddress + ':setName', { "parameters": { "name": name } })
-        #print r.data
-        #for i in ['default', 'mdns', 'webui']:
-        for i in ['default', 'webui']:
+        for i in ['webui']:
             r = self.uapost('/Device/' + physAddress + ':setName', { "parameters": { "name": name, "source": i } })
-            #print r.data
         return json.loads(r.data)
 
     def uaget(self, url):
@@ -84,7 +83,12 @@ class Devices(object):
     def __init__(self, url):
         self.url = url
 
-class data(object):
+class interface_object(object):
+    def getDSLStats(self):
+        r = self.uapost(':getDSLStats')
+
+        return json.loads(r.data)
+
     def setFirstParameter(self, data):
         r = self.uapost(':setFirstParameter', data)
 
@@ -113,7 +117,12 @@ class Intf(object):
 
     def __init__(self, url):
         self.url = url
-        self.data = data(url + '/data')
+        self.data = interface_object(url + '/data')
+        self.dsl0 = interface_object(url + '/dsl0')
+        self.lan = interface_object(url + '/lan')
+        self.wwan = interface_object(url + '/wwan')
+        self.wl0 = interface_object(url + '/wl0')
+        self.wl1 = interface_object(url + '/wl1')
 
 class NeMo(object):
     def uaget(self, url):
@@ -133,7 +142,13 @@ class Wifi(object):
         self.Status = j['result']['status']['Status']
         self.ConfigurationMode = j['result']['status']['ConfigurationMode']
         self.Enable = j['result']['status']['Enable']
+
         return j
+
+    def getStats(self):
+        r = self.uapost(':getStats')
+
+        return json.loads(r.data)
 
     def uaget(self, url):
         return uaget(self.url + url)
@@ -186,7 +201,7 @@ class FunBox(object):
         cookie.load(ident + '...context=' + contextID)
 
     def DeviceInfo(self):
-        r = self.uapost('/sysbus/DeviceInfo')
+        r = self.uaget('/sysbus/DeviceInfo?_restDepth=-1')
         return json.loads(r.data)
 
     def disconnect(self):
