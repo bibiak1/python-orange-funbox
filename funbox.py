@@ -135,6 +135,28 @@ class NeMo(object):
         self.url = url
         self.Intf = Intf(url + '/Intf')
 
+class Firewall(object):
+
+    def setPortForwarding(self,description,enabled,dest,iport,eport,rid):
+        if enabled:
+            r = self.uapost(':setPortForwarding',{"parameters":{"description": description,"persistent":"true","enable":"true","protocol":"6","destinationIPAddress": dest,"internalPort": iport,"externalPort": eport,"origin":"webui","sourceInterface":"data","sourcePrefix":"","id": rid}})
+        else:
+            r = self.uapost(':setPortForwarding',{"parameters":{"description": description,"persistent":"true","disable":"true","protocol":"6","destinationIPAddress": dest,"internalPort": iport,"externalPort": eport,"origin":"webui","sourceInterface":"data","sourcePrefix":"","id": rid}})
+        return json.loads(r.data)
+    
+    def getExternalIpAddress(self):
+        r = self.uapost('/PCP:getExternalIpAddress', {"parameters": {}})
+        return json.loads(r.data)
+
+    def uaget(self, url):
+        return uaget(self.url + url)
+
+    def uapost(self, url, data={ "parameters": {} }):
+        return uapost(self.url + url, data)
+
+    def __init__(self, url):
+        self.url = url
+
 class Wifi(object):
     def get(self):
         r = self.uapost(':get')
@@ -170,6 +192,17 @@ class NMC(object):
     def checkForUpgrades(self):
         r = self.uapost(':checkForUpgrades')
         return json.loads(r.data)
+    
+    def setWanMode(self,WanMode,Username):
+        r = self.uapost(':setWanMode', {"parameters":{"WanMode":WanMode,"Username":Username}})
+        return json.loads(r.data)
+
+    def IPv4Requested(self,value):
+        if value:
+            r = self.uapost('/IPv6:set', {"parameters":{"IPv4UserRequested":"true"}})
+        else:
+            r = self.uapost('/IPv6:set', {"parameters":{"IPv4UserRequested":"false"}})
+        return json.loads(r.data)
 
     def reboot(self):
         self.uapost(':reboot')
@@ -203,6 +236,10 @@ class FunBox(object):
     def DeviceInfo(self):
         r = self.uaget('/sysbus/DeviceInfo?_restDepth=-1')
         return json.loads(r.data)
+    
+    def logout(self):
+        r = self.uaget('/logout')
+        return r.data
 
     def disconnect(self):
         r = self.NeMo.Intf.data.setFirstParameter({ "parameters": { "name": "Enable", "value": 0, "flag": "ppp", "traverse": "down"}})
@@ -239,5 +276,9 @@ class FunBox(object):
         self.Hosts = Hosts(self.url + '/sysbus/Hosts')
         self.Devices = Devices(self.url + '/sysbus/Devices')
         self.NeMo = NeMo(self.url + '/sysbus/NeMo')
+        self.Firewall = Firewall(self.url + '/sysbus/Firewall')
+
+    def __del__(self):
+        self.logout()
 
 # vim: tabstop=8 expandtab shiftwidth=4 softtabstop=4
