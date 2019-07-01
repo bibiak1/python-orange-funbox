@@ -33,9 +33,10 @@ def uapost(url, data):
     h['Cookie'] = '; '.join(cookie.output(attrs=[], header='').replace('...', '/').split())
 
     try:
-        r = ua.request('POST', url, body=json.dumps(data).encode('utf-8'), headers=h)
-    except:
-        print 'Error: post (url: ' + url + ')'
+        encoded_data = json.dumps(data).encode('utf-8')
+        r = ua.request('POST', url, body=encoded_data, headers=h)
+    except Exception as e:
+        print 'Error: post (url: ' + url + ') :: ' + str(e)
         sys.exit(-1)
 
     return r
@@ -59,7 +60,7 @@ class Hosts(object):
         self.url = url
      
 class Devices(object):
-    def get(self, data={"parameters":{"expression":{"usbM2M":" usb && wmbus and .Active==true","usb":" printer && physical and .Active==true","usblogical":"volume && logical and .Active==true","wifi":"wifi && edev and .Active==true","eth":"eth && edev and .Active==true","dect":"voice && dect && handset && physical"}}}):
+    def get(self, data={"parameters":{"expression":{"usbM2M":" usb && wmbus","usb":" printer && physical","usblogical":"volume && logical","wifi":"wifi && edev","eth":"eth && edev","dect":"voice && dect && handset && physical"}}}):
         r = self.uapost(':get', data)
         return json.loads(r.data.decode('utf-8', 'replace'), strict=False)
 
