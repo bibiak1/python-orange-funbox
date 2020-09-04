@@ -4,7 +4,11 @@
 #import httplib
 #httplib.HTTPConnection.debuglevel = 5
 
-import urllib3, sys, json, Cookie, re
+import urllib3, sys, json, re
+try:
+	import Cookie
+except:
+	import http.cookies as Cookie
 from time import sleep
 
 cookie = Cookie.SimpleCookie()
@@ -18,7 +22,7 @@ def uaget(url):
     try:
         r = ua.request('GET', url)
     except:
-        print 'Error: get (url: ' + url + ')'
+        print('Error: get (url: ' + url + ')')
         sys.exit(-1)
 
     if 'set-cookie' in r.headers:
@@ -33,9 +37,10 @@ def uapost(url, data):
     h['Cookie'] = '; '.join(cookie.output(attrs=[], header='').replace('...', '/').split())
 
     try:
-        r = ua.request('POST', url, body=json.dumps(data).encode('utf-8'), headers=h)
-    except:
-        print 'Error: post (url: ' + url + ')'
+        encoded_data = json.dumps(data).encode('utf-8')
+        r = ua.request('POST', url, body=encoded_data, headers=h)
+    except Exception as e:
+        print('Error: post (url: ' + url + ') :: ' + str(e))
         sys.exit(-1)
 
     return r
@@ -43,11 +48,11 @@ def uapost(url, data):
 class Hosts(object):
     def getDevices(self):
         r = self.uapost(':getDevices')
-        return json.loads(r.data)
+        return json.loads(r.data.decode('utf-8'))
 
     def delHost(self, hostmacaddress):
         r = self.uapost(':delHost', { "parameters": { "physAddress": hostmacaddress } })
-        return json.loads(r.data)    
+        return json.loads(r.data.decode('utf-8'))    
 
     def uaget(self, url):
         return uaget(self.url + url)
@@ -59,20 +64,20 @@ class Hosts(object):
         self.url = url
      
 class Devices(object):
-    def get(self, data={"parameters":{"expression":{"usbM2M":" usb && wmbus and .Active==true","usb":" printer && physical and .Active==true","usblogical":"volume && logical and .Active==true","wifi":"wifi && edev and .Active==true","eth":"eth && edev and .Active==true","dect":"voice && dect && handset && physical"}}}):
+    def get(self, data={"parameters":{"expression":{"usbM2M":" usb && wmbus","usb":" printer && physical","usblogical":"volume && logical","wifi":"wifi && edev","eth":"eth && edev","dect":"voice && dect && handset && physical"}}}):
         r = self.uapost(':get', data)
         return json.loads(r.data.decode('utf-8', 'replace'), strict=False)
 
     def destroyDevice(self, hostmacaddress):
         r = self.uapost(':destroyDevice', { "parameters": { "key": hostmacaddress } })
-        return json.loads(r.data)
+        return json.loads(r.data.decode('utf-8'))
 
     def setName(self, physAddress, name):
         physAddress = physAddress.upper()
         r = self.uapost('/Device/' + physAddress + ':setName', { "parameters": { "name": name } })
         for i in ['webui']:
             r = self.uapost('/Device/' + physAddress + ':setName', { "parameters": { "name": name, "source": i } })
-        return json.loads(r.data)
+        return json.loads(r.data.decode('utf-8'))
 
     def uaget(self, url):
         return uaget(self.url + url)
@@ -87,17 +92,17 @@ class interface_object(object):
     def getDSLStats(self):
         r = self.uapost(':getDSLStats')
 
-        return json.loads(r.data)
+        return json.loads(r.data.decode('utf-8'))
 
     def setFirstParameter(self, data):
         r = self.uapost(':setFirstParameter', data)
 
-        return json.loads(r.data)
+        return json.loads(r.data.decode('utf-8'))
 
     def getMIBs(self, name):
         r = self.uapost(':getMIBs', {"parameters": {"mibs": name}})
 
-        return json.loads(r.data)
+        return json.loads(r.data.decode('utf-8'))
 
     def uaget(self, url):
         return uaget(self.url + url)
@@ -160,7 +165,7 @@ class Firewall(object):
 class Wifi(object):
     def get(self):
         r = self.uapost(':get')
-        j = json.loads(r.data)
+        j = json.loads(r.data.decode('utf-8'))
         self.Status = j['result']['status']['Status']
         self.ConfigurationMode = j['result']['status']['ConfigurationMode']
         self.Enable = j['result']['status']['Enable']
@@ -170,7 +175,7 @@ class Wifi(object):
     def getStats(self):
         r = self.uapost(':getStats')
 
-        return json.loads(r.data)
+        return json.loads(r.data.decode('utf-8'))
 
     def uaget(self, url):
         return uaget(self.url + url)
@@ -187,27 +192,32 @@ class Wifi(object):
 class NMC(object):
     def getWANStatus(self):
         r = self.uapost(':getWANStatus')
-        return json.loads(r.data)
+        return json.loads(r.data.decode('utf-8'))
 
     def checkForUpgrades(self):
         r = self.uapost(':checkForUpgrades')
-        return json.loads(r.data)
+        return json.loads(r.data.decode('utf-8'))
     
     def setWanMode(self,WanMode,Username):
         r = self.uapost(':setWanMode', {"parameters":{"WanMode":WanMode,"Username":Username}})
-        return json.loads(r.data)
+        return json.loads(r.data.decode('utf-8'))
 
     def IPv4Requested(self,value):
         if value:
             r = self.uapost('/IPv6:set', {"parameters":{"IPv4UserRequested":"true"}})
         else:
             r = self.uapost('/IPv6:set', {"parameters":{"IPv4UserRequested":"false"}})
-        return json.loads(r.data)
+        return json.loads(r.data.decode('utf-8'))
 
     def reboot(self):
         self.uapost(':reboot')
 
         return True
+
+    def setLANIP(self, Address, Netmask, DHCPEnable, DHCPMinAddress, DHCPMaxAddress):
+        r = self.uapost(':setLANIP', { "parameters": { "Address": Address, "Netmask": Netmask, "DHCPEnable": DHCPEnable, "DHCPMinAddress": DHCPMinAddress, "DHCPMaxAddress": DHCPMaxAddress } })
+
+        return json.loads(r.data.decode('utf-8'))
 
     def uaget(self, url):
         return uaget(self.url + url)
@@ -227,15 +237,23 @@ class FunBox(object):
         sleep(1)
         r = self.uapost('/authenticate?username=' + login + '&password=' + password, { 'username': login, 'password': password })
         cookie.load(r.headers['set-cookie'].replace('/', '...'))
-        contextID = json.loads(r.data.decode('utf-8'))['data']['contextID'].encode('ascii','ignore')
-        h['X-Context'] = contextID
-        ident = r.headers['set-cookie'][0:8]
-        cookie.load(ident + '...login=admin')
-        cookie.load(ident + '...context=' + contextID)
+        try:
+            contextID = json.loads(r.data.decode('utf-8'))['data']['contextID'].encode('ascii','ignore')
+            h['X-Context'] = contextID
+            ident = r.headers['set-cookie'][0:8]
+            cookie.load(ident + '...login=admin')
+            cookie.load(ident + '...context=' + contextID)
+        except:
+            contextID = json.loads(r.data.decode('utf-8'))['data']['contextID']
+            h['X-Context'] = contextID
+            ident = r.headers['set-cookie'][0:8]
+            cookie.load(ident + '...login=admin')
+            cookie.load(ident + '...context=' + contextID)
+
 
     def DeviceInfo(self):
         r = self.uaget('/sysbus/DeviceInfo?_restDepth=-1')
-        return json.loads(r.data)
+        return json.loads(r.data.decode('utf-8'))
     
     def logout(self):
         r = self.uaget('/logout')
