@@ -295,6 +295,8 @@ class FunBox(object):
         self.Devices = Devices(self.url + '/sysbus/Devices')
         self.NeMo = NeMo(self.url + '/sysbus/NeMo')
         self.Firewall = Firewall(self.url + '/sysbus/Firewall')
+        self.Wifi = Wifi(self.url + '/sysbus/NMC/Wifi')
+        self.Intf = Intf(self.url + '/sysbus/NeMo/Intf')
 
     def __del__(self):
         self.logout()
