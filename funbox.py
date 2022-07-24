@@ -29,7 +29,7 @@ def uaget(url):
         cookie.load(r.headers['set-cookie'].replace('/', '...'))
 
     return r
-     
+
 def uapost(url, data):
     global ua, h, timeout
 
@@ -52,17 +52,17 @@ class Hosts(object):
 
     def delHost(self, hostmacaddress):
         r = self.uapost(':delHost', { "parameters": { "physAddress": hostmacaddress } })
-        return json.loads(r.data.decode('utf-8'))    
+        return json.loads(r.data.decode('utf-8'))
 
     def uaget(self, url):
         return uaget(self.url + url)
 
     def uapost(self, url, data={ "parameters": {} }):
         return uapost(self.url + url, data)
-       
+
     def __init__(self, url):
         self.url = url
-     
+
 class Devices(object):
     def get(self, data={"parameters":{"expression":{"usbM2M":" usb && wmbus","usb":" printer && physical","usblogical":"volume && logical","wifi":"wifi && edev","eth":"eth && edev","dect":"voice && dect && handset && physical"}}}):
         r = self.uapost(':get', data)
@@ -84,7 +84,7 @@ class Devices(object):
 
     def uapost(self, url, data={ "parameters": {} }):
         return uapost(self.url + url, data)
-       
+
     def __init__(self, url):
         self.url = url
 
@@ -148,7 +148,7 @@ class Firewall(object):
         else:
             r = self.uapost(':setPortForwarding',{"parameters":{"description": description,"persistent":"true","disable":"true","protocol":"6","destinationIPAddress": dest,"internalPort": iport,"externalPort": eport,"origin":"webui","sourceInterface":"data","sourcePrefix":"","id": rid}})
         return json.loads(r.data)
-    
+
     def getExternalIpAddress(self):
         r = self.uapost('/PCP:getExternalIpAddress', {"parameters": {}})
         return json.loads(r.data)
@@ -182,13 +182,13 @@ class Wifi(object):
 
     def uapost(self, url, data={ "parameters": {} }):
         return uapost(self.url + url, data)
-       
+
     def __init__(self, url):
         self.url = url
         self.Status = "Unknown"
         self.ConfigurationMode = "Unknown"
         self.Enable = "Unknown"
-    
+
 class NMC(object):
     def getWANStatus(self):
         r = self.uapost(':getWANStatus')
@@ -197,7 +197,7 @@ class NMC(object):
     def checkForUpgrades(self):
         r = self.uapost(':checkForUpgrades')
         return json.loads(r.data.decode('utf-8'))
-    
+
     def setWanMode(self,WanMode,Username):
         r = self.uapost(':setWanMode', {"parameters":{"WanMode":WanMode,"Username":Username}})
         return json.loads(r.data.decode('utf-8'))
@@ -224,7 +224,7 @@ class NMC(object):
 
     def uapost(self, url, data={ "parameters": {} }):
         return uapost(self.url + url, data)
-       
+
     def __init__(self, url):
         self.url = url
         self.Wifi = Wifi(url + '/Wifi')
@@ -254,7 +254,7 @@ class FunBox(object):
     def DeviceInfo(self):
         r = self.uaget('/sysbus/DeviceInfo?_restDepth=-1')
         return json.loads(r.data.decode('utf-8'))
-    
+
     def logout(self):
         r = self.uaget('/logout')
         return r.data
@@ -295,6 +295,8 @@ class FunBox(object):
         self.Devices = Devices(self.url + '/sysbus/Devices')
         self.NeMo = NeMo(self.url + '/sysbus/NeMo')
         self.Firewall = Firewall(self.url + '/sysbus/Firewall')
+        self.Wifi = Wifi(self.url + '/sysbus/NMC/Wifi')
+        self.Intf = Intf(self.url + '/sysbus/NeMo/Intf')
 
     def __del__(self):
         self.logout()
